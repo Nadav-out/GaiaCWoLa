@@ -6,3 +6,4 @@ wandb/*
 *.png
 gaia_data/
 plots/
+*.h5
