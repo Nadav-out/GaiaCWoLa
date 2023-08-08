@@ -4,3 +4,5 @@ wandb/*
 *.pyc
 *.pdf
 *.png
+gaia_data/
+plots/
