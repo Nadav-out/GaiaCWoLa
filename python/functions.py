@@ -85,6 +85,95 @@ def make_plots(df, save_folder = "../plots"):
 
     plt.savefig(os.path.join(save_folder, "coords.pdf"))
     
+class SignalSideband:
+    def __init__(self, df, sr_factor=1, sb_factor=3, scan_over_mu_phi=False):
+        self.df = df
+        self.sr_factor = sr_factor
+        self.sb_factor = sb_factor
+        self.scan_over_mu_phi = scan_over_mu_phi
+        self.df_slice = None
+        self.var = None
+        self.sb_min = None
+        self.sb_max = None
+        self.sr_min = None
+        self.sr_max = None
+
+    def process_data(self):
+        if self.scan_over_mu_phi:
+            self.var = "μ_ϕcosλ"
+        else:
+            self.var = "μ_λ"
+
+        self.sb_min = self.df[self.df.stream][self.var].median() - self.sb_factor * self.df[self.df.stream][self.var].std()
+        self.sb_max = self.df[self.df.stream][self.var].median() + self.sb_factor * self.df[self.df.stream][self.var].std()
+        self.sr_min = self.df[self.df.stream][self.var].median() - self.sr_factor * self.df[self.df.stream][self.var].std()
+        self.sr_max = self.df[self.df.stream][self.var].median() + self.sr_factor * self.df[self.df.stream][self.var].std()
+
+        self.df_slice = self.df[(self.df[self.var] >= self.sb_min) & (self.df[self.var] <= self.sb_max)]
+        self.df_slice['label'] = np.where(((self.df_slice[self.var] >= self.sr_min) & (self.df_slice[self.var] <= self.sr_max)), 1, 0)
+
+    def plot_sb_data(self, save_folder=None):
+        bins = np.linspace(self.sb_min - (self.sr_min - self.sb_min), self.sb_max + (self.sb_max - self.sr_max), 50)
+        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10,5), dpi=300, tight_layout=True) 
+
+        ax = axs[0]
+        N, bins, patches = ax.hist(self.df[self.df.stream == False][self.var], edgecolor='None', bins=bins)
+        for i in range(len(patches)):
+            if bins[i] < self.sb_min or bins[i] > self.sb_max:
+                patches[i].set_alpha(0.4)
+                patches[i].set_fc('lightgray')
+            elif (self.sb_min <= bins[i] and bins[i] < self.sr_min) or (self.sr_max < bins[i] and bins[i] <= self.sb_max):
+                patches[i].set_fc('lightgray')
+            elif self.sr_min <= bins[i] and bins[i] <= self.sr_max:
+                patches[i].set_fc('gray')
+
+        from matplotlib.patches import Patch
+        custom_legend = [Patch(facecolor='lightgray', alpha=0.25, label='Outer Region'),
+                         Patch(facecolor='lightgray', alpha=1, label='Sideband Region'),
+                         Patch(facecolor='gray', alpha=1, label='Signal Region'),
+                        ]
+        ax.set_title('Background Stars', fontsize=23)
+        if self.var == "μ_ϕcosλ": 
+            ax.set_xlabel(r'$\mu_\phi^*$ [mas/year]', fontsize=20)
+        else:
+            ax.set_xlabel(r'$\mu_\lambda$ [mas/year]', fontsize=20)
+        ax.set_ylabel('Number of Stars', fontsize=20)
+        ax.legend(handles=custom_legend, loc="upper left", frameon=False)
+
+        ax = axs[1]
+        N, bins, patches = ax.hist(self.df[self.df.stream == True][self.var], edgecolor='None', bins=bins)
+        for i in range(len(patches)):
+            if bins[i] < self.sb_min or bins[i] > self.sb_max:
+                patches[i].set_alpha(0.25)
+                patches[i].set_fc('crimson')
+            elif (self.sb_min <= bins[i] and bins[i] < self.sr_min) or (self.sr_max < bins[i] and bins[i] <= self.sb_max):
+                patches[i].set_alpha(0.4)
+                patches[i].set_fc('crimson')
+            elif self.sr_min <= bins[i] and bins[i] <= self.sr_max:
+                patches[i].set_fc('crimson')
+
+        custom_legend = [Patch(facecolor='crimson', alpha=0.25, label='Outer Region'),
+                         Patch(facecolor='crimson', alpha=0.4, label='Sideband Region'),
+                         Patch(facecolor='crimson', alpha=1, label='Signal Region'),
+                        ]
+        ax.set_title('Stream Stars', fontsize=23)
+        if self.var == "μ_ϕcosλ": 
+            ax.set_xlabel(r'$\mu_\phi^*$ [mas/year]', fontsize=20)
+        else:
+            ax.set_xlabel(r'$\mu_\lambda$ [mas/year]', fontsize=20)
+        ax.set_ylabel('Number of Stars', fontsize=20)
+        ax.legend(handles=custom_legend, frameon=False)
+
+        if save_folder is not None:
+            if self.var == "μ_ϕcosλ": 
+                plt.savefig(os.path.join(save_folder, "mu_phi.pdf"))    
+            else: 
+                plt.savefig(os.path.join(save_folder, "mu_lambda.pdf"))
+
+        plt.show()
+
+
+    
 def signal_sideband(df, sr_factor = 1, sb_factor = 3, save_folder=None, sb_min=None, sb_max=None, sr_min=None, sr_max=None, verbose=True, scan_over_mu_phi=False):
     
     print("SR factor:", sr_factor)
