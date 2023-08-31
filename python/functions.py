@@ -328,13 +328,14 @@ class SignalSideband:
         Compute sample size ratios between signal and sideband regions.
         Returns f_{stream,signal}/f_{stream,sideband} and  total(signal)/total(sideband)
         """
+
         n_sig_stream_stars = self.sr.stream.value_counts().get(True, 0)
         n_sig_bkg_stars = self.sr.stream.value_counts().get(False, 0)
         n_sideband_stream_stars = self.sb.stream.value_counts().get(True, 0)
         n_sideband_bkg_stars = self.sb.stream.value_counts().get(False, 0)
        
-        f_signal_ratio = n_sig_stream_stars/n_sig_bkg_stars/(n_sideband_stream_stars/n_sideband_bkg_stars) if n_sig_bkg_stars != 0 and n_sideband_bkg_stars != 0 else 0
-        sr_sb_ratio = len(self.sr) / len(self.sb) if len(self.sb) != 0 else 0
+        f_signal_ratio = (n_sig_stream_stars/n_sig_bkg_stars)/(n_sideband_stream_stars/n_sideband_bkg_stars) if n_sig_bkg_stars != 0 and n_sideband_bkg_stars != 0 else 0
+        sr_sb_ratio = len(self.sr) / (len(self.sb)) if len(self.sb) != 0 else 0
 
         return f_signal_ratio, sr_sb_ratio
     
