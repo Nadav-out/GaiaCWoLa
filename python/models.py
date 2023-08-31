@@ -18,9 +18,41 @@ from keras import callbacks, regularizers
 from sklearn.metrics import roc_curve, auc,roc_auc_score
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from sklearn import preprocessing
+from sklearn.preprocessing import StandardScaler
 
 ### Custom imports
 from functions import *
+
+def prepare_data(df, vars_list):
+    """Prepare data for training/testing/validation."""
+    sc = StandardScaler()
+    x = sc.fit_transform(df[vars_list])
+    y = df.label.to_numpy()
+    return x, y
+
+def build_model(input_dim, layer_size=200, dropout=0.2):
+    """Create and compile a model."""
+    model = Sequential()
+    model.add(Dense(layer_size, input_dim=input_dim, activation='relu')) 
+    if dropout != 0: model.add(Dropout(dropout))
+    model.add(Dense(layer_size, activation='relu'))
+    if dropout != 0: model.add(Dropout(dropout))
+    model.add(Dense(layer_size, activation='relu'))
+    if dropout != 0: model.add(Dropout(dropout))
+    model.add(Dense(1, activation='sigmoid'))
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model
+
+### Define model architecture 
+                # model = Sequential()
+                # model.add(Dense(layer_size, input_dim=len(training_vars), activation='relu')) 
+                # if dropout != 0: model.add(Dropout(dropout))
+                # model.add(Dense(layer_size, activation='relu'))
+                # if dropout != 0: model.add(Dropout(dropout))
+                # model.add(Dense(layer_size, activation='relu'))
+                # if dropout != 0: model.add(Dropout(dropout))
+                # model.add(Dense(1, activation='sigmoid'))
+                # model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
 def train(df, layer_size=200, batch_size=10000, dropout=0.2, epochs=100, patience=30, n_folds=5, best_of_n_loops=3, save_folder=None, other_callbacks=None, verbose=True, scan_over_mu_phi=False, apply_cuts=True):
     os.makedirs(save_folder, exist_ok=True)
@@ -28,6 +60,8 @@ def train(df, layer_size=200, batch_size=10000, dropout=0.2, epochs=100, patienc
         training_vars = ['ϕ', 'λ', 'μ_λ', 'b-r', 'g']
     else:
         training_vars = ['ϕ', 'λ', 'μ_ϕcosλ', 'b-r', 'g']
+
+    model=build_model(len(training_vars))
    
     ### Explicitly get indices of stars for each k-fold
     skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=15)
@@ -61,16 +95,19 @@ def train(df, layer_size=200, batch_size=10000, dropout=0.2, epochs=100, patienc
             test = df.iloc[test_stars]
         
             ### Standardize the inputs (x) and create the array of labels (y)
-            from sklearn.preprocessing import StandardScaler
-            sc = StandardScaler()
-            train_x = sc.fit_transform(train[training_vars])
-            train_y = train.label.to_numpy()
+            # sc = StandardScaler()
+            # train_x = sc.fit_transform(train[training_vars])
+            # train_y = train.label.to_numpy()
 
-            val_x = sc.transform(val[training_vars])
-            val_y = val.label.to_numpy()
+            # val_x = sc.transform(val[training_vars])
+            # val_y = val.label.to_numpy()
 
-            test_x = sc.transform(test[training_vars])
-            test_y = test.label.to_numpy()
+            # test_x = sc.transform(test[training_vars])
+            # test_y = test.label.to_numpy()
+            
+            train_x, train_y= prepare_data(train, training_vars)
+            val_x, val_y= prepare_data(val, training_vars)
+            test_x, test_y= prepare_data(test, training_vars)
             
             ### Temporary -- apply an extra weight to the signal region
             if "weight" not in train.keys(): 
@@ -86,15 +123,15 @@ def train(df, layer_size=200, batch_size=10000, dropout=0.2, epochs=100, patienc
                 os.makedirs(os.path.join(save_folder_val, "loop_{}".format(n)), exist_ok=True)
                 
                 ### Define model architecture 
-                model = Sequential()
-                model.add(Dense(layer_size, input_dim=len(training_vars), activation='relu')) 
-                if dropout != 0: model.add(Dropout(dropout))
-                model.add(Dense(layer_size, activation='relu'))
-                if dropout != 0: model.add(Dropout(dropout))
-                model.add(Dense(layer_size, activation='relu'))
-                if dropout != 0: model.add(Dropout(dropout))
-                model.add(Dense(1, activation='sigmoid'))
-                model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+                # model = Sequential()
+                # model.add(Dense(layer_size, input_dim=len(training_vars), activation='relu')) 
+                # if dropout != 0: model.add(Dropout(dropout))
+                # model.add(Dense(layer_size, activation='relu'))
+                # if dropout != 0: model.add(Dropout(dropout))
+                # model.add(Dense(layer_size, activation='relu'))
+                # if dropout != 0: model.add(Dropout(dropout))
+                # model.add(Dense(1, activation='sigmoid'))
+                # model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
                 ### Early stopping (stops training if val_loss doesn't improve for [patience] straight epochs)
                 early_stopping = callbacks.EarlyStopping(monitor='val_loss', 
