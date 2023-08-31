@@ -15,6 +15,7 @@ import shutil
 from keras.layers import Input, Dense, Dropout
 from keras.models import Model, Sequential
 from keras import callbacks, regularizers
+import keras.backend as K
 from sklearn.metrics import roc_curve, auc,roc_auc_score
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from sklearn import preprocessing
@@ -43,16 +44,21 @@ def build_model(input_dim, layer_size=200, dropout=0.2):
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
 
-### Define model architecture 
-                # model = Sequential()
-                # model.add(Dense(layer_size, input_dim=len(training_vars), activation='relu')) 
-                # if dropout != 0: model.add(Dropout(dropout))
-                # model.add(Dense(layer_size, activation='relu'))
-                # if dropout != 0: model.add(Dropout(dropout))
-                # model.add(Dense(layer_size, activation='relu'))
-                # if dropout != 0: model.add(Dropout(dropout))
-                # model.add(Dense(1, activation='sigmoid'))
-                # model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+def reset_weights(model):
+    session = K.get_session()
+    for layer in model.layers: 
+        if hasattr(layer, 'kernel_initializer') and layer.kernel.initializer is not None:
+            layer.kernel.initializer.run(session=session)
+            
+
+def get_callbacks(patience, weights_path):
+    """Generate a list of callbacks for Keras model."""
+    early_stopping = callbacks.EarlyStopping(monitor='val_loss', patience=patience, verbose=0)
+    checkpoint = callbacks.ModelCheckpoint(weights_path, monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=True)
+    return [checkpoint, early_stopping]
+
+
+
 
 def train(df, layer_size=200, batch_size=10000, dropout=0.2, epochs=100, patience=30, n_folds=5, best_of_n_loops=3, save_folder=None, other_callbacks=None, verbose=True, scan_over_mu_phi=False, apply_cuts=True):
     os.makedirs(save_folder, exist_ok=True)
@@ -61,6 +67,7 @@ def train(df, layer_size=200, batch_size=10000, dropout=0.2, epochs=100, patienc
     else:
         training_vars = ['ϕ', 'λ', 'μ_ϕcosλ', 'b-r', 'g']
 
+    # Build the model
     model=build_model(len(training_vars))
    
     ### Explicitly get indices of stars for each k-fold
@@ -93,18 +100,8 @@ def train(df, layer_size=200, batch_size=10000, dropout=0.2, epochs=100, patienc
             train = df.iloc[train_stars]
             val = df.iloc[val_stars]
             test = df.iloc[test_stars]
-        
-            ### Standardize the inputs (x) and create the array of labels (y)
-            # sc = StandardScaler()
-            # train_x = sc.fit_transform(train[training_vars])
-            # train_y = train.label.to_numpy()
-
-            # val_x = sc.transform(val[training_vars])
-            # val_y = val.label.to_numpy()
-
-            # test_x = sc.transform(test[training_vars])
-            # test_y = test.label.to_numpy()
             
+            ### Standardize the inputs (x) and create the array of labels (y)
             train_x, train_y= prepare_data(train, training_vars)
             val_x, val_y= prepare_data(val, training_vars)
             test_x, test_y= prepare_data(test, training_vars)
@@ -122,16 +119,8 @@ def train(df, layer_size=200, batch_size=10000, dropout=0.2, epochs=100, patienc
             for n in range(best_of_n_loops): 
                 os.makedirs(os.path.join(save_folder_val, "loop_{}".format(n)), exist_ok=True)
                 
-                ### Define model architecture 
-                # model = Sequential()
-                # model.add(Dense(layer_size, input_dim=len(training_vars), activation='relu')) 
-                # if dropout != 0: model.add(Dropout(dropout))
-                # model.add(Dense(layer_size, activation='relu'))
-                # if dropout != 0: model.add(Dropout(dropout))
-                # model.add(Dense(layer_size, activation='relu'))
-                # if dropout != 0: model.add(Dropout(dropout))
-                # model.add(Dense(1, activation='sigmoid'))
-                # model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+                ### Reset model weights
+                reset_weights(model)
 
                 ### Early stopping (stops training if val_loss doesn't improve for [patience] straight epochs)
                 early_stopping = callbacks.EarlyStopping(monitor='val_loss', 
@@ -146,6 +135,8 @@ def train(df, layer_size=200, batch_size=10000, dropout=0.2, epochs=100, patienc
                                                        verbose=0, 
                                                        save_best_only=True, 
                                                        save_weights_only=True)
+                
+                
 
                 ### Add any additional callbacks for training
                 callbacks_list = [checkpoint,early_stopping]
