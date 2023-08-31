@@ -7,3 +7,4 @@ wandb/*
 gaia_data/
 plots/
 *.h5
+.DS_Store
