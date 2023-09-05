@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
+from matplotlib.patches import Patch
 from tqdm import tqdm
 
 ### Plot setup
@@ -220,9 +221,10 @@ class SignalSideband:
     signal_sideband_processor.process_data()
     signal_sideband_processor.plot_sb_data()
     """
-    def __init__(self, df, scan_over_mu_phi=False, sb_factor=1.0, sr_factor=1.0, verbose=True,process=False):
+    def __init__(self, df, variable="μ_λ", var_name='$\mu_\lambda$ [mas/year]', sb_factor=1.0, sr_factor=1.0, verbose=True,process=False):
         self.df = df
-        self.scan_over_mu_phi = scan_over_mu_phi
+        self.var = variable
+        self.var_name=var_name
         self.sb_factor = sb_factor
         self.sr_factor = sr_factor
         self.verbose = verbose
@@ -234,7 +236,6 @@ class SignalSideband:
         """
         Process the data to create a sliced DataFrame based on signal-sideband conditions.
         """
-        self.var = "μ_ϕcosλ" if self.scan_over_mu_phi else "μ_λ"
         
         if self.verbose:
             print("Scanning over " + str(self.var))
@@ -292,7 +293,6 @@ class SignalSideband:
         Compute sample size ratios between signal and sideband regions.
         Returns f_{stream,signal}/f_{stream,sideband} and  total(signal)/total(sideband)
         """
-
         n_sig_stream_stars = self.sr.stream.value_counts().get(True, 0)
         n_sig_bkg_stars = self.sr.stream.value_counts().get(False, 0)
         n_sideband_stream_stars = self.sb.stream.value_counts().get(True, 0)
@@ -327,16 +327,12 @@ class SignalSideband:
             elif self.sr_min <= bins[i] and bins[i] <= self.sr_max:
                 patches[i].set_fc('gray')
 
-        from matplotlib.patches import Patch
         custom_legend = [Patch(facecolor='lightgray', alpha=0.25, label='Outer Region'),
                          Patch(facecolor='lightgray', alpha=1, label='Sideband Region'),
                          Patch(facecolor='gray', alpha=1, label='Signal Region'),
                         ]
         ax.set_title('Background Stars', fontsize=23)
-        if self.var == "μ_ϕcosλ": 
-            ax.set_xlabel(r'$\mu_\phi^*$ [mas/year]', fontsize=20)
-        else:
-            ax.set_xlabel(r'$\mu_\lambda$ [mas/year]', fontsize=20)
+        ax.set_xlabel(f'{self.var_name}', fontsize=20)
         ax.set_ylabel('Number of Stars', fontsize=20)
         ax.legend(handles=custom_legend, loc="upper left", frameon=False)
 
@@ -357,22 +353,192 @@ class SignalSideband:
                          Patch(facecolor='crimson', alpha=1, label='Signal Region'),
                         ]
         ax.set_title('Stream Stars', fontsize=23)
-        if self.var == "μ_ϕcosλ": 
-            ax.set_xlabel(r'$\mu_\phi^*$ [mas/year]', fontsize=20)
-        else:
-            ax.set_xlabel(r'$\mu_\lambda$ [mas/year]', fontsize=20)
+        ax.set_xlabel(f'{self.var_name}', fontsize=20)
         ax.set_ylabel('Number of Stars', fontsize=20)
         ax.legend(handles=custom_legend, frameon=False)
         
         if save_folder is not None:
-            if self.var == "μ_ϕcosλ": 
-                plt.savefig(os.path.join(save_folder, "mu_phi.pdf"))    
-            else: 
-                plt.savefig(os.path.join(save_folder, "mu_lambda.pdf"))
+            plt.savefig(os.path.join(save_folder, self.var+".pdf"))
+            # if self.var == "μ_ϕcosλ": 
+            #     plt.savefig(os.path.join(save_folder, "mu_phi.pdf"))    
+            # else: 
+            #     plt.savefig(os.path.join(save_folder, "mu_lambda.pdf"))
 
         plt.show()
 
+# class SignalSideband:
+#     """
+#     A class for processing and plotting signal-sideband data.
+    
+#     Attributes:
+#     df: DataFrame containing the input data.
+#     sr_factor: Signal region factor.
+#     sb_factor: Sideband region factor.
+#     scan_over_mu_phi: If True, variable for scanning will be 'μ_ϕcosλ'. Else, it'll be 'μ_λ'.
+#     df_slice: Processed DataFrame after applying signal-sideband conditions.
+#     var: Variable selected based on scan_over_mu_phi.
+#     sb_min, sb_max: Min and max bounds for sideband region.
+#     sr_min, sr_max: Min and max bounds for signal region.
+#     verbose: Boolean to control verbose output.
+#     process: Boolean controling process in initiation.
+    
+    
+#     Example use:
+#     signal_sideband_processor = SignalSideband(df)
+#     signal_sideband_processor.process_data()
+#     signal_sideband_processor.plot_sb_data()
+#     """
+#     def __init__(self, df, scan_over_mu_phi=False, sb_factor=1.0, sr_factor=1.0, verbose=True,process=False):
+#         self.df = df
+#         self.scan_over_mu_phi = scan_over_mu_phi
+#         self.sb_factor = sb_factor
+#         self.sr_factor = sr_factor
+#         self.verbose = verbose
+        
+#         if process:
+#             self.process_data()
 
+#     def process_data(self):
+#         """
+#         Process the data to create a sliced DataFrame based on signal-sideband conditions.
+#         """
+#         self.var = "μ_ϕcosλ" if self.scan_over_mu_phi else "μ_λ"
+        
+#         if self.verbose:
+#             print("Scanning over " + str(self.var))
+
+#         filtered_df = self.df.loc[self.df.stream, self.var]
+#         median_val = filtered_df.median()
+#         std_val = filtered_df.std()
+
+#         self.sb_min = median_val - self.sb_factor * std_val
+#         self.sb_max = median_val + self.sb_factor * std_val
+#         self.sr_min = median_val - self.sr_factor * std_val
+#         self.sr_max = median_val + self.sr_factor * std_val
+
+
+#         # Create the df_slice
+#         self.df_slice = self.df[(self.df[self.var] >= self.sb_min) & (self.df[self.var] <= self.sb_max)].copy()
+
+#         # Create the 'label' column
+#         self.df_slice['label'] = np.where((self.df_slice[self.var] >= self.sr_min) & (self.df_slice[self.var] <= self.sr_max), 1, 0)
+
+#         # Create the sr and sb dataframes
+#         self.sr = self.df_slice[self.df_slice.label == 1]
+#         self.sb = self.df_slice[self.df_slice.label == 0]
+
+        
+#         if self.verbose:
+#             print("Sideband region: [{:.1f},{:.1f}) & ({:.1f},{:.1f}]".format(self.sb_min, self.sr_min, self.sr_max, self.sb_max))
+#             print("Signal region: [{:.1f},{:.1f}]".format(self.sr_min, self.sr_max))
+#             print("Total counts: SR = {:,}, SB = {:,}".format(len(self.sr), len(self.sb)))
+            
+#             # Verbose output for stream counts
+#             if "stream" in self.df.keys():
+#                 n_sig_stream_stars = self.sr.stream.value_counts().get(True, 0)
+#                 n_sig_bkg_stars = self.sr.stream.value_counts().get(False, 0)
+#                 n_sideband_stream_stars = self.sb.stream.value_counts().get(True, 0)
+#                 n_sideband_bkg_stars = self.sb.stream.value_counts().get(False, 0)
+
+#                 print("Signal region has {:,} stream and {:,} bkg events ({:.2f}%).".format(n_sig_stream_stars, n_sig_bkg_stars, 100 * n_sig_stream_stars/n_sig_bkg_stars if n_sig_bkg_stars != 0 else 0))
+#                 print("Sideband region has {:,} stream and {:,} bkg events ({:.2f}%).".format(n_sideband_stream_stars, n_sideband_bkg_stars, 100 * n_sideband_stream_stars/n_sideband_bkg_stars if n_sideband_bkg_stars != 0 else 0))
+#                 print("f_sig = {:.1f}X f_sideband.".format(n_sig_stream_stars/n_sig_bkg_stars/(n_sideband_stream_stars/n_sideband_bkg_stars) if n_sig_bkg_stars != 0 and n_sideband_bkg_stars != 0 else 0))
+
+#     def set_factors(self, sb_factor, sr_factor, verbose=False, process=True):
+#         """
+#         Update signal and sideband regions parameters.
+#         """
+
+#         self.sb_factor = sb_factor
+#         self.sr_factor = sr_factor
+#         self.verbose=verbose
+#         if process:
+#             self.process_data()
+
+#     def compute_ratios(self):
+#         """
+#         Compute sample size ratios between signal and sideband regions.
+#         Returns f_{stream,signal}/f_{stream,sideband} and  total(signal)/total(sideband)
+#         """
+
+#         n_sig_stream_stars = self.sr.stream.value_counts().get(True, 0)
+#         n_sig_bkg_stars = self.sr.stream.value_counts().get(False, 0)
+#         n_sideband_stream_stars = self.sb.stream.value_counts().get(True, 0)
+#         n_sideband_bkg_stars = self.sb.stream.value_counts().get(False, 0)
+       
+#         f_signal_ratio = (n_sig_stream_stars/n_sig_bkg_stars)/(n_sideband_stream_stars/n_sideband_bkg_stars) if n_sig_bkg_stars != 0 and n_sideband_bkg_stars != 0 else 0
+#         sr_sb_ratio = len(self.sr) / (len(self.sb)) if len(self.sb) != 0 else 0
+
+#         return f_signal_ratio, sr_sb_ratio
+    
+# #     def plot_sb_data(self, save_folder=None):
+#         """
+#         Plot signal-sideband data with color-coded regions.
+        
+#         Arguments:
+#         save_folder: Optional, path to the folder where plots will be saved.
+#         """
+#         bins = np.linspace(self.sb_min - (self.sr_min - self.sb_min), 
+#                            self.sb_max + (self.sb_max - self.sr_max), 50)
+
+#         fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10,5), dpi=300, tight_layout=True)
+        
+        
+#         ax = axs[0]
+#         N, bins, patches = ax.hist(self.df[self.df.stream == False][self.var], edgecolor='None', bins=bins)
+#         for i in range(len(patches)):
+#             if bins[i] < self.sb_min or bins[i] > self.sb_max:
+#                 patches[i].set_alpha(0.4)
+#                 patches[i].set_fc('lightgray')
+#             elif (self.sb_min <= bins[i] and bins[i] < self.sr_min) or (self.sr_max < bins[i] and bins[i] <= self.sb_max):
+#                 patches[i].set_fc('lightgray')
+#             elif self.sr_min <= bins[i] and bins[i] <= self.sr_max:
+#                 patches[i].set_fc('gray')
+
+#         from matplotlib.patches import Patch
+#         custom_legend = [Patch(facecolor='lightgray', alpha=0.25, label='Outer Region'),
+#                          Patch(facecolor='lightgray', alpha=1, label='Sideband Region'),
+#                          Patch(facecolor='gray', alpha=1, label='Signal Region'),
+#                         ]
+#         ax.set_title('Background Stars', fontsize=23)
+#         if self.var == "μ_ϕcosλ": 
+#             ax.set_xlabel(r'$\mu_\phi^*$ [mas/year]', fontsize=20)
+#         else:
+#             ax.set_xlabel(r'$\mu_\lambda$ [mas/year]', fontsize=20)
+#         ax.set_ylabel('Number of Stars', fontsize=20)
+#         ax.legend(handles=custom_legend, loc="upper left", frameon=False)
+
+#         ax = axs[1]
+#         N, bins, patches = ax.hist(self.df[self.df.stream == True][self.var], edgecolor='None', bins=bins)
+#         for i in range(len(patches)):
+#             if bins[i] < self.sb_min or bins[i] > self.sb_max:
+#                 patches[i].set_alpha(0.25)
+#                 patches[i].set_fc('crimson')
+#             elif (self.sb_min <= bins[i] and bins[i] < self.sr_min) or (self.sr_max < bins[i] and bins[i] <= self.sb_max):
+#                 patches[i].set_alpha(0.4)
+#                 patches[i].set_fc('crimson')
+#             elif self.sr_min <= bins[i] and bins[i] <= self.sr_max:
+#                 patches[i].set_fc('crimson')
+
+#         custom_legend = [Patch(facecolor='crimson', alpha=0.25, label='Outer Region'),
+#                          Patch(facecolor='crimson', alpha=0.4, label='Sideband Region'),
+#                          Patch(facecolor='crimson', alpha=1, label='Signal Region'),
+#                         ]
+#         ax.set_title('Stream Stars', fontsize=23)
+#         if self.var == "μ_ϕcosλ": 
+#             ax.set_xlabel(r'$\mu_\phi^*$ [mas/year]', fontsize=20)
+#         else:
+#             ax.set_xlabel(r'$\mu_\lambda$ [mas/year]', fontsize=20)
+#         ax.set_ylabel('Number of Stars', fontsize=20)
+#         ax.legend(handles=custom_legend, frameon=False)
+        
+#         if save_folder is not None:
+#             if self.var == "μ_ϕcosλ": 
+#                 plt.savefig(os.path.join(save_folder, "mu_phi.pdf"))    
+#             else: 
+#                 plt.savefig(os.path.join(save_folder, "mu_lambda.pdf"))
+
+#         plt.show()
 
 
 
