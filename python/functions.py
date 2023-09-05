@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib import gridspec
 from tqdm import tqdm
 
 ### Plot setup
@@ -17,6 +18,116 @@ plt.rcParams.update({
     "legend.fontsize": 11,
     "figure.max_open_warning": False,
 })
+
+
+
+
+
+
+def corner_plots(standardized_design, vars, nn_score_inds, stream_inds, density=True):
+    dat_T = standardized_design.T
+    dat_T_labeled = standardized_design[nn_score_inds].T
+    dat_T_stream = standardized_design[stream_inds].T
+
+    n_vars = len(vars)
+
+    
+    if density:
+        bottom=0
+        def custom_formatter(x, pos):
+            if x == 0:
+                return ''
+            elif x < 10:
+                return f'{x:.1f}'
+            else:
+                return f'{int(x)}'
+    else:
+        bottom=1
+        def custom_formatter(x, pos):
+            if x == 1:
+                return ''
+            else:
+                return f'{int(x)}'
+
+    fig = plt.figure(figsize=(15, 15))
+    gs = gridspec.GridSpec(n_vars, n_vars, wspace=0, hspace=0)
+    axs = [[None for _ in range(n_vars)] for _ in range(n_vars)]
+
+    # For storing the first instances of scatter plots for the legend
+    scatter_all_stars = None
+    scatter_labeled_stars = None
+    scatter_nn_score = None
+
+    for i in range(n_vars):
+        for j in range(n_vars):
+            sharex = axs[0][j] if i > 0 else None
+            sharey = axs[i][0] if j > 0 and i != j else None
+            axs[i][j] = fig.add_subplot(gs[i, j], sharex=sharex, sharey=sharey)
+
+    for i in range(n_vars):
+        for j in range(n_vars):
+            if i == j:
+                axs[i][j].hist(dat_T[i], bins=50, color='gray', alpha=0.6, density=density)
+                axs[i][j].hist(dat_T_stream[i], bins=50, color='blue', alpha=0.4, density=density)
+                axs[i][j].hist(dat_T_labeled[i], bins=50, color='orange', alpha=0.6, density=density)
+                axs[i][j].set_ylim(bottom=bottom)
+                if not(density):
+                    axs[i][j].set_yscale('log')
+                axs[i][j].set_title(f'Histogram of {vars[i]}', loc='center')
+                axs[i][j].yaxis.tick_right()
+                axs[i][j].yaxis.set_major_formatter(plt.FuncFormatter(custom_formatter))
+                if i == 0 and j == 0:
+                    axs[i][j].set_ylabel('', labelpad=5)
+                    if not(density):
+                        axs[i][j].set_yscale('log')
+            elif i > j:
+                if scatter_all_stars is None:
+                    scatter_all_stars = axs[i][j].scatter(dat_T[j], dat_T[i], c='gray', alpha=0.2, s=.03)
+                else:
+                    axs[i][j].scatter(dat_T[j], dat_T[i], c='gray', alpha=0.2, s=.03)
+                
+                if scatter_labeled_stars is None:
+                    scatter_labeled_stars = axs[i][j].scatter(dat_T_stream[j], dat_T_stream[i], c='blue', alpha=0.4, s=1)
+                else:
+                    axs[i][j].scatter(dat_T_stream[j], dat_T_stream[i], c='blue', alpha=0.4, s=1)
+
+                if scatter_nn_score is None:
+                    scatter_nn_score = axs[i][j].scatter(dat_T_labeled[j], dat_T_labeled[i], c='orange', alpha=0.8, s=3)
+                else:
+                    axs[i][j].scatter(dat_T_labeled[j], dat_T_labeled[i], c='orange', alpha=0.8, s=3)
+            else:
+                axs[i][j].axis('off')
+
+    for i in range(n_vars):
+        for j in range(n_vars):
+            axs[i][j].tick_params(
+                axis='both',
+                which='both',
+                direction='in',
+                top=True,
+                right=True,
+                left=True,
+                labelbottom=(i == n_vars - 1),
+                labelleft=(j == 0 and i!=0)
+            )
+
+    for i in range(n_vars):
+        axs[-1][i].set_xlabel(vars[i], labelpad=5)
+        if i > 0:
+            axs[i][0].set_ylabel(vars[i], labelpad=5)
+
+    # Add legend to the top-right plot
+    custom_markers = [
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=6, alpha=.8),
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', markersize=6, alpha=.8),
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='orange', markersize=6, alpha=.8)
+    ]
+    axs[0][1].legend(custom_markers, [r'All Stars', r'Labeled Stars', r'NN score $>0.7$'], loc='center right', frameon=False)
+    
+    plt.show()
+
+
+
 
 def fiducial_cuts(df):
     df = df[df.g < 20.2] # reduces streaking 
@@ -85,153 +196,6 @@ def make_plots(df, save_folder = "../plots"):
 
     plt.savefig(os.path.join(save_folder, "coords.pdf"))
     
-
-# class SignalSideband:
-#     """
-#     A class for processing and plotting signal-sideband data.
-    
-#     Attributes:
-#     df: DataFrame containing the input data.
-#     sr_factor: Signal region factor.
-#     sb_factor: Sideband region factor.
-#     scan_over_mu_phi: If True, variable for scanning will be 'μ_ϕcosλ'. Else, it'll be 'μ_λ'.
-#     df_slice: Processed DataFrame after applying signal-sideband conditions.
-#     var: Variable selected based on scan_over_mu_phi.
-#     sb_min, sb_max: Min and max bounds for sideband region.
-#     sr_min, sr_max: Min and max bounds for signal region.
-#     verbose: Boolean to control verbose output.
-#     """
-    
-#     def __init__(self, df, sr_factor=1, sb_factor=3, scan_over_mu_phi=False, verbose=True):
-#         """
-#         Initialize SignalSideband with provided parameters.
-#         """
-#         self.df = df.copy()
-#         self.sr_factor = sr_factor
-#         self.sb_factor = sb_factor
-#         self.verbose = verbose
-#         self.scan_over_mu_phi = scan_over_mu_phi
-#         self.df_slice = None
-#         self.var = None
-#         self.sb_min = None
-#         self.sb_max = None
-#         self.sr_min = None
-#         self.sr_max = None
-        
-#         if self.verbose:
-#             print("SR factor:", sr_factor)
-#             print("SB factor:", sb_factor)
-
-#     def process_data(self):
-#         """
-#         Process the data to create a sliced DataFrame based on signal-sideband conditions.
-#         """
-#         self.var = "μ_ϕcosλ" if self.scan_over_mu_phi else "μ_λ"
-
-#         if self.verbose:
-#             print("Scanning over "+str(self.var))
-
-#         self.sb_min = self.df[self.df.stream][self.var].median() - self.sb_factor * self.df[self.df.stream][self.var].std()
-#         self.sb_max = self.df[self.df.stream][self.var].median() + self.sb_factor * self.df[self.df.stream][self.var].std()
-#         self.sr_min = self.df[self.df.stream][self.var].median() - self.sr_factor * self.df[self.df.stream][self.var].std()
-#         self.sr_max = self.df[self.df.stream][self.var].median() + self.sr_factor * self.df[self.df.stream][self.var].std()
-
-#         if self.verbose:
-#             print("Sideband region: [{:.1f},{:.1f}) & ({:.1f},{:.1f}]".format(self.sb_min, self.sr_min, self.sr_max, self.sb_max))
-#             print("Signal region: [{:.1f},{:.1f}]".format(self.sr_min, self.sr_max))
-
-#         self.df_slice = self.df[(self.df[self.var] >= self.sb_min) & (self.df[self.var] <= self.sb_max)]
-#         self.df_slice['label'] = np.where(((self.df_slice[self.var] >= self.sr_min) & (self.df_slice[self.var] <= self.sr_max)), 1, 0)
-
-#         # Verbose output for stream counts
-#         if  self.verbose:
-#             # Total counts
-#             n_total_stream = self.df.stream.value_counts().get(True, 0)
-#             n_total_bkg = self.df.stream.value_counts().get(False, 0)
-#             print("Total counts: {:,} stream and {:,} bkg events.".format(n_total_stream, n_total_bkg))
-            
-#             if "stream" in self.df.keys():
-#                 # Stream counts and fractions
-#                 n_sig_stream_stars = self.df_slice[self.df_slice.label == 1].stream.value_counts().get(True, 0)
-#                 n_sig_bkg_stars = self.df_slice[self.df_slice.label == 1].stream.value_counts().get(False, 0)
-#                 n_sideband_stream_stars = self.df_slice[self.df_slice.label == 0].stream.value_counts().get(True, 0)
-#                 n_sideband_bkg_stars = self.df_slice[self.df_slice.label == 0].stream.value_counts().get(False, 0)
-
-#                 print("Signal region has {:,} stream and {:,} bkg events ({:.2f}%).".format(n_sig_stream_stars, n_sig_bkg_stars,100*n_sig_stream_stars/n_sig_bkg_stars if n_sig_bkg_stars != 0 else 0))
-#                 print("Sideband region has {:,} stream and {:,} bkg events ({:.2f}%).".format(n_sideband_stream_stars, n_sideband_bkg_stars, 100*n_sideband_stream_stars/n_sideband_bkg_stars if n_sideband_bkg_stars != 0 else 0))
-#                 print("f_sig = {:.1f}* f_sideband.".format(n_sig_stream_stars/n_sig_bkg_stars/(n_sideband_stream_stars/n_sideband_bkg_stars) if n_sig_bkg_stars != 0 and n_sideband_bkg_stars != 0 else 0))
-
-
-
-#     def plot_sb_data(self, save_folder=None):
-#         """
-#         Plot signal-sideband data with color-coded regions.
-        
-#         Arguments:
-#         save_folder: Optional, path to the folder where plots will be saved.
-#         """
-#         bins = np.linspace(self.sb_min - (self.sr_min - self.sb_min), 
-#                            self.sb_max + (self.sb_max - self.sr_max), 50)
-
-#         fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10,5), dpi=300, tight_layout=True)
-        
-        
-#         ax = axs[0]
-#         N, bins, patches = ax.hist(self.df[self.df.stream == False][self.var], edgecolor='None', bins=bins)
-#         for i in range(len(patches)):
-#             if bins[i] < self.sb_min or bins[i] > self.sb_max:
-#                 patches[i].set_alpha(0.4)
-#                 patches[i].set_fc('lightgray')
-#             elif (self.sb_min <= bins[i] and bins[i] < self.sr_min) or (self.sr_max < bins[i] and bins[i] <= self.sb_max):
-#                 patches[i].set_fc('lightgray')
-#             elif self.sr_min <= bins[i] and bins[i] <= self.sr_max:
-#                 patches[i].set_fc('gray')
-
-#         from matplotlib.patches import Patch
-#         custom_legend = [Patch(facecolor='lightgray', alpha=0.25, label='Outer Region'),
-#                          Patch(facecolor='lightgray', alpha=1, label='Sideband Region'),
-#                          Patch(facecolor='gray', alpha=1, label='Signal Region'),
-#                         ]
-#         ax.set_title('Background Stars', fontsize=23)
-#         if self.var == "μ_ϕcosλ": 
-#             ax.set_xlabel(r'$\mu_\phi^*$ [mas/year]', fontsize=20)
-#         else:
-#             ax.set_xlabel(r'$\mu_\lambda$ [mas/year]', fontsize=20)
-#         ax.set_ylabel('Number of Stars', fontsize=20)
-#         ax.legend(handles=custom_legend, loc="upper left", frameon=False)
-
-#         ax = axs[1]
-#         N, bins, patches = ax.hist(self.df[self.df.stream == True][self.var], edgecolor='None', bins=bins)
-#         for i in range(len(patches)):
-#             if bins[i] < self.sb_min or bins[i] > self.sb_max:
-#                 patches[i].set_alpha(0.25)
-#                 patches[i].set_fc('crimson')
-#             elif (self.sb_min <= bins[i] and bins[i] < self.sr_min) or (self.sr_max < bins[i] and bins[i] <= self.sb_max):
-#                 patches[i].set_alpha(0.4)
-#                 patches[i].set_fc('crimson')
-#             elif self.sr_min <= bins[i] and bins[i] <= self.sr_max:
-#                 patches[i].set_fc('crimson')
-
-#         custom_legend = [Patch(facecolor='crimson', alpha=0.25, label='Outer Region'),
-#                          Patch(facecolor='crimson', alpha=0.4, label='Sideband Region'),
-#                          Patch(facecolor='crimson', alpha=1, label='Signal Region'),
-#                         ]
-#         ax.set_title('Stream Stars', fontsize=23)
-#         if self.var == "μ_ϕcosλ": 
-#             ax.set_xlabel(r'$\mu_\phi^*$ [mas/year]', fontsize=20)
-#         else:
-#             ax.set_xlabel(r'$\mu_\lambda$ [mas/year]', fontsize=20)
-#         ax.set_ylabel('Number of Stars', fontsize=20)
-#         ax.legend(handles=custom_legend, frameon=False)
-        
-#         if save_folder is not None:
-#             if self.var == "μ_ϕcosλ": 
-#                 plt.savefig(os.path.join(save_folder, "mu_phi.pdf"))    
-#             else: 
-#                 plt.savefig(os.path.join(save_folder, "mu_lambda.pdf"))
-
-#         plt.show()
-
 
 
 class SignalSideband:
@@ -411,127 +375,7 @@ class SignalSideband:
 
 
 
-    
-# def signal_sideband(df, sr_factor = 1, sb_factor = 3, save_folder=None, sb_min=None, sb_max=None, sr_min=None, sr_max=None, verbose=True, scan_over_mu_phi=False):
-    
-#     print("SR factor:", sr_factor)
-#     print("SB factor:", sb_factor)
-    
-#     if scan_over_mu_phi:
-#         var = "μ_ϕcosλ"
-#     else:
-#         var = "μ_λ"
-        
-#     print("Scanning over "+str(var))
-    
-#     if sb_min is not None:
-#         sb_min = sb_min
-#         sb_max = sb_max
-#         sr_min = sr_min
-#         sr_max = sr_max    
-#     else: 
-#         sb_min = df[df.stream][var].median()-sb_factor*df[df.stream][var].std()
-#         sb_max = df[df.stream][var].median()+sb_factor*df[df.stream][var].std()
-#         sr_min = df[df.stream][var].median()-sr_factor*df[df.stream][var].std()
-#         sr_max = df[df.stream][var].median()+sr_factor*df[df.stream][var].std()
-        
-#     if verbose:
-#         print("Sideband region: [{:.1f},{:.1f}) & ({:.1f},{:.1f}]".format(sb_min, sr_min, sr_max, sb_max))
-#         print("Signal region: [{:.1f},{:.1f}]".format(sr_min,sr_max))
-    
-#     df_slice = df[(df[var] >= sb_min) & (df[var] <= sb_max)]
-#     df_slice['label'] = np.where(((df_slice[var] >= sr_min) & (df_slice[var] <= sr_max)), 1, 0)
-    
-#     sr = df_slice[df_slice.label == 1]
-#     sb = df_slice[df_slice.label == 0]
-#     if verbose: print("Total counts: SR = {:,}, SB = {:,}".format(len(sr), len(sb)))
 
-#     outer_region = df[(df[var] < sb_min) | (df[var] > sb_max)]
-#     sb = df[(df[var] >= sb_min) & (df[var] <= sb_max)]
-#     sr = df[(df[var] >= sr_min) & (df[var] <= sr_max)]    
-        
-#     bins = np.linspace(sb_min - (sr_min - sb_min), sb_max + (sb_max - sr_max), 40)
-
-#     ### Make the plot
-#     fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10,5), dpi=300, tight_layout=True) 
-#     bins = np.linspace(sb_min - (sr_min - sb_min), sb_max + (sb_max - sr_max), 50)
-
-#     ax = axs[0]
-#     N, bins, patches = ax.hist(df[df.stream == False][var], edgecolor='None', bins=bins)
-#     for i in range(len(patches)):
-#         if bins[i] < sb_min or bins[i] > sb_max:
-#             patches[i].set_alpha(0.4)
-#             patches[i].set_fc('lightgray')
-#         elif (sb_min <= bins[i] and bins[i] < sr_min) or (sr_max < bins[i] and bins[i] <= sb_max):
-#             patches[i].set_fc('lightgray')
-#         elif sr_min <= bins[i] and bins[i] <= sr_max:
-#             patches[i].set_fc('gray')
-
-#     from matplotlib.patches import Patch
-#     custom_legend = [Patch(facecolor='lightgray', alpha=0.25, label='Outer Region'),
-#                      Patch(facecolor='lightgray', alpha=1, label='Sideband Region'),
-#                      Patch(facecolor='gray', alpha=1, label='Signal Region'),
-#                     ]
-#     ax.set_title('Background Stars', fontsize=23)
-#     if var == "μ_ϕcosλ": 
-#         ax.set_xlabel(r'$\mu_\phi^*$ [mas/year]', fontsize=20)
-#     else:
-#         ax.set_xlabel(r'$\mu_\lambda$ [mas/year]', fontsize=20)
-#     ax.set_ylabel('Number of Stars', fontsize=20)
-#     ax.legend(handles=custom_legend, loc="upper left", frameon=False);
-
-#     ax = axs[1]
-#     N, bins, patches = ax.hist(df[df.stream == True][var], edgecolor='None', bins=bins)
-#     for i in range(len(patches)):
-#         if bins[i] < sb_min or bins[i] > sb_max:
-#             patches[i].set_alpha(0.25)
-#             patches[i].set_fc('crimson')
-#         elif (sb_min <= bins[i] and bins[i] < sr_min) or (sr_max < bins[i] and bins[i] <= sb_max):
-#             patches[i].set_alpha(0.4)
-#             patches[i].set_fc('crimson')
-#         elif sr_min <= bins[i] and bins[i] <= sr_max:
-#             patches[i].set_fc('crimson')
-
-#     from matplotlib.patches import Patch
-#     custom_legend = [Patch(facecolor='crimson', alpha=0.25, label='Outer Region'),
-#                      Patch(facecolor='crimson', alpha=0.4, label='Sideband Region'),
-#                      Patch(facecolor='crimson', alpha=1, label='Signal Region'),
-#                     ]
-#     ax.set_title('Stream Stars', fontsize=23)
-#     if var == "μ_ϕcosλ": 
-#         ax.set_xlabel(r'$\mu_\phi^*$ [mas/year]', fontsize=20)
-#     else:
-#         ax.set_xlabel(r'$\mu_\lambda$ [mas/year]', fontsize=20)
-#     ax.set_ylabel('Number of Stars', fontsize=20)
-#     ax.legend(handles=custom_legend, frameon=False);
-
-#     ax.set_title('Stream Stars', fontsize=23)
-#     if var == "μ_ϕcosλ": 
-#         ax.set_xlabel(r'$\mu_\phi^*$ [mas/year]', fontsize=20)
-#     else:
-#         ax.set_xlabel(r'$\mu_\lambda$ [mas/year]', fontsize=20)
-#     ax.set_ylabel('Number of Stars', fontsize=20)
-#     if save_folder is not None:
-#         if var == "μ_ϕcosλ": 
-#             plt.savefig(os.path.join(save_folder,"mu_phi.pdf"))    
-#         else: 
-#             plt.savefig(os.path.join(save_folder,"mu_lambda.pdf"))    
-    
-#     if "stream" in df.keys():
-#         try: n_sig_stream_stars = sr.stream.value_counts()[True]
-#         except: n_sig_stream_stars = 0
-#         try: n_sideband_stream_stars = sb.stream.value_counts()[True]
-#         except: n_sideband_stream_stars = 0
-#         try: n_sig_bkg_stars = sr.stream.value_counts()[False]
-#         except: n_sig_bkg_stars = 0
-#         try: n_sideband_bkg_stars = sb.stream.value_counts()[False]
-#         except: n_sideband_bkg_stars = 0
-          
-#         if verbose:
-#             print("Signal region has {:,} stream and {:,} bkg events ({:.2f}%).".format(n_sig_stream_stars, n_sig_bkg_stars,100*n_sig_stream_stars/n_sig_bkg_stars))
-#             print("Sideband region has {:,} stream and {:,} bkg events ({:.2f}%).".format(n_sideband_stream_stars, n_sideband_bkg_stars, 100*n_sideband_stream_stars/n_sideband_bkg_stars))
-#             print("f_sig = {:.1f}X f_sideband.".format(n_sig_stream_stars/n_sig_bkg_stars/(n_sideband_stream_stars/n_sideband_bkg_stars)))
-#     return df_slice
 
 def plot_results(test, top_n = [50, 100], save_folder=None, verbose=True, show=True):
     if save_folder is not None: 
