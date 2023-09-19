@@ -67,7 +67,7 @@ def train(df, layer_size=200, batch_size=10000, dropout=0.2, epochs=100, patienc
     else:
         training_vars = ['ϕ', 'λ', 'μ_ϕcosλ', 'b-r', 'g']
     
-    training_vars = ['p1', 'p2', 'p3', 'p4', 'p5']
+#     training_vars = ['p1', 'p2', 'p3', 'p4', 'p5']
 
     # Build the model
     model=build_model(len(training_vars))
@@ -206,4 +206,3 @@ def train(df, layer_size=200, batch_size=10000, dropout=0.2, epochs=100, patienc
         
     return(test_full)
     
-
