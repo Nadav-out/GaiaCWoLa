@@ -496,8 +496,9 @@ def FilterGD1(stars, gd1_stars):
 
 def load_file(filename):
     column_names = ["μ_δ", "μ_α", "δ", "α", "b-r", "g", "ϕ", "λ", "μ_ϕcosλ", "μ_λ"]
-    gd1_stars = np.load('../gaia_data/gd1/gd1_stars.npy')
     df = pd.DataFrame(np.load(filename), columns = column_names)
+    gd1_stars = np.load('../gaia_data/gd1/gd1_stars.npy')
+
 
     ### Label stream stars 
     is_stream, stream = FilterGD1(np.array(df), gd1_stars)
